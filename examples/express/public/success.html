@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Thank you</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <p id="test" class="notice" hidden>Test order: no real payment was taken.</p>
+  <h1 id="title">Checking your payment…</h1>
+  <p id="message"></p>
+  <div id="summary" class="box" hidden></div>
+  <p><a href="/">Continue shopping</a></p>
+
+  <script>
+    const dollars = (c) => `$${(c / 100).toFixed(2)}`;
+    const token = new URLSearchParams(location.search).get("order");
+    const $ = (id) => document.getElementById(id);
+    let tries = 0;
+
+    function row(label, value, cls = "") {
+      const r = document.createElement("div");
+      r.className = `row ${cls}`;
+      const a = document.createElement("span"); a.textContent = label;
+      const b = document.createElement("span"); b.textContent = value;
+      r.append(a, b);
+      return r;
+    }
+
+    async function check() {
+      let o;
+      try {
+        const res = await fetch(`/api/orders/${encodeURIComponent(token ?? "")}`);
+        if (res.status === 404) throw new Error("not found");
+        o = await res.json();
+      } catch {
+        $("title").textContent = "Thank you";
+        $("message").textContent = "We couldn't show your order just now, but if your payment went through you'll get a confirmation email shortly.";
+        return;
+      }
+      $("test").hidden = !o.test;
+      const s = $("summary");
+      s.replaceChildren(...o.items.map((i) => row(`${i.quantity} × ${i.title}`, dollars(i.unitCents * i.quantity))), row("Shipping", o.shippingCents ? dollars(o.shippingCents) : "Free"));
+      if (o.taxCents) s.append(row("Tax", dollars(o.taxCents)));
+      s.append(row("Total", dollars(o.totalCents), "total"));
+      s.hidden = false;
+
+      if (o.status === "paid" || o.status === "refunded") {
+        try { localStorage.removeItem("cart"); } catch {}
+        $("title").textContent = "Thank you for your order";
+        $("message").textContent = o.email ? `We've received your payment. A receipt is on its way to ${o.email}.` : "We've received your payment.";
+      } else if (o.status === "awaiting" && tries < 40) {
+        // The webhook is usually a second or two behind; the server also asks Stripe directly.
+        $("title").textContent = "Confirming your payment…";
+        $("message").textContent = "This usually takes a few seconds. This page updates by itself.";
+        tries++;
+        setTimeout(check, tries < 20 ? 3000 : 10000);
+      } else {
+        $("title").textContent = o.status === "awaiting" ? "We're still confirming your payment" : "Your payment didn't go through";
+        $("message").textContent = o.status === "awaiting" ? "We'll email you as soon as it's confirmed." : "Nothing was charged. Your cart is still saved, so you can try again.";
+      }
+    }
+
+    check();
+  </script>
+</body>
+</html>
