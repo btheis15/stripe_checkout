@@ -1,0 +1,20 @@
+{
+  "name": "stripe-checkout-express-example",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A complete Stripe Checkout (hosted page) integration: cart, checkout, signed webhooks, success page, refunds.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --watch --env-file-if-exists=.env server.js",
+    "create-webhook": "node --env-file-if-exists=.env scripts/create-webhook.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.0",
+    "stripe": "^22.0.0"
+  }
+}

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Example shop</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <h1>Example shop</h1>
+  <p id="cancelled" class="notice" hidden>Payment cancelled. Nothing was charged, and your cart is still here.</p>
+  <div id="products" class="products"></div>
+
+  <h2>Cart</h2>
+  <div class="box">
+    <div id="cart"><p class="muted">Your cart is empty.</p></div>
+    <p>
+      <label>Ship to <select id="country"></select></label>
+    </p>
+    <p id="error" class="notice error" hidden></p>
+    <button id="pay" disabled>Continue to secure payment</button>
+    <p class="muted">Payments are processed by Stripe. Card details never reach this site.<br />Test card: 4242 4242 4242 4242, any future date, any CVC.</p>
+  </div>
+
+  <script>
+    // The cart holds ids and quantities only; prices shown here are for display, the server re-prices everything.
+    const dollars = (c) => `$${(c / 100).toFixed(2)}`;
+    const load = () => { try { return JSON.parse(localStorage.getItem("cart") ?? "{}"); } catch { return {}; } };
+    const save = (c) => { try { localStorage.setItem("cart", JSON.stringify(c)); } catch {} };
+    let cart = load();
+    let products = [];
+
+    if (new URLSearchParams(location.search).has("cancelled")) document.getElementById("cancelled").hidden = false;
+
+    function el(tag, props = {}, ...children) {
+      const e = Object.assign(document.createElement(tag), props);
+      e.append(...children);
+      return e;
+    }
+
+    function render() {
+      const box = document.getElementById("cart");
+      const lines = Object.entries(cart).filter(([id]) => products.some((p) => p.id === id));
+      box.replaceChildren();
+      if (!lines.length) box.append(el("p", { className: "muted", textContent: "Your cart is empty." }));
+      let subtotal = 0;
+      for (const [id, qty] of lines) {
+        const p = products.find((x) => x.id === id);
+        subtotal += p.price_cents * qty;
+        const remove = el("button", { className: "ghost", textContent: "Remove", onclick: () => { delete cart[id]; save(cart); render(); } });
+        box.append(el("div", { className: "row" }, el("span", { textContent: `${qty} × ${p.title}` }), el("span", {}, `${dollars(p.price_cents * qty)} `, remove)));
+      }
+      if (lines.length) box.append(el("div", { className: "row total" }, el("span", { textContent: "Subtotal" }), el("span", { textContent: dollars(subtotal) })), el("p", { className: "muted", textContent: "Shipping and any tax are added on the payment page." }));
+      document.getElementById("pay").disabled = !lines.length;
+    }
+
+    async function start() {
+      const res = await fetch("/api/products");
+      const data = await res.json();
+      products = data.products;
+      document.getElementById("country").append(...data.countries.map((c) => el("option", { value: c, textContent: c })));
+      document.getElementById("products").append(
+        ...products.map((p) =>
+          el("div", { className: "card" },
+            el("div", {}, el("strong", { textContent: p.title }), el("div", { className: "muted", textContent: `${dollars(p.price_cents)}${p.stock !== null ? ` · ${p.stock} left` : ""}` })),
+            el("button", { textContent: "Add to cart", disabled: p.stock === 0, onclick: () => { cart[p.id] = (cart[p.id] ?? 0) + 1; save(cart); render(); } }),
+          ),
+        ),
+      );
+      render();
+    }
+
+    document.getElementById("pay").onclick = async (e) => {
+      const button = e.currentTarget;
+      const error = document.getElementById("error");
+      button.disabled = true;
+      button.textContent = "Starting secure checkout…";
+      error.hidden = true;
+      try {
+        const res = await fetch("/api/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lines: Object.entries(cart).map(([productId, qty]) => ({ productId, qty })), country: document.getElementById("country").value }),
+        });
+        const data = await res.json();
+        if (data.url) return void (location.href = data.url);
+        error.textContent = data.error ?? "Something went wrong. Please try again.";
+      } catch {
+        error.textContent = "Couldn't reach checkout. Check your connection and try again.";
+      }
+      error.hidden = false;
+      button.disabled = false;
+      button.textContent = "Continue to secure payment";
+    };
+
+    start();
+  </script>
+</body>
+</html>
