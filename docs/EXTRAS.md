@@ -115,8 +115,8 @@ choose on Stripe's page; the chosen one is `session.shipping_cost`.
 Easiest: Stripe → **Settings → Branding** (logo, icon, colors, fonts). Applies
 to every session, no code.
 
-Per session (useful if one Stripe account serves several sites), newer API
-versions accept `branding_settings`:
+Per session (useful if one Stripe account serves several sites),
+`branding_settings` (in use in production with API `2026-08-26.dahlia`):
 
 ```js
 branding_settings: {
@@ -144,6 +144,24 @@ try {
 
 Product images on the page: `price_data.product_data.images: ["https://…"]`
 (public https URLs).
+
+### Checkout Studio settings
+
+If you set up the page in Stripe's **Checkout Studio**, it gives you fields
+that tie each session to those settings. The production shop this guide comes
+from sends these (alongside the fields in the examples):
+
+```js
+ui_mode: "hosted_page",
+origin_context: "web",
+integration_identifier: "hosted_web_0002", // the identifier Studio shows for your integration
+billing_address_collection: "auto",
+submit_type: "auto",
+allow_promotion_codes: false,
+```
+
+They're optional: without them you get the default hosted page, which is what
+the examples use. Copy the exact values Studio shows for your own account.
 
 ## Extra fields and notes
 

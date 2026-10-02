@@ -9,6 +9,11 @@ shows the payment form, and Stripe tells your server when the money has
 arrived. Card numbers never touch your site, which keeps you at the simplest
 PCI level (SAQ A).
 
+Everything here is taken from a Stripe checkout that is running in production
+on a live shop (stripe-node 22, API version `2026-08-26.dahlia`), with the
+site-specific parts removed. The flow, the session settings and the webhook
+handling are the ones that site uses.
+
 ```
  browser ── cart (ids + quantities only) ──▶ your server
                                              · re-reads every price and stock count
